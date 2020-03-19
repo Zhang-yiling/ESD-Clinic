@@ -1,8 +1,22 @@
+from flask import Flask, request
+from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
+from datetime import datetime
+import json
+
+import pika
+
 import paypalrestsdk
 import logging
 from paypalrestsdk import Payout, ResourceNotFound
 from paypalrestsdk import Invoice
 
+app=Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://clinic_db_user:rootroot@localhost:3306/payment'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+CORS(app)
 
 paypalrestsdk.configure(
     {
@@ -13,50 +27,14 @@ paypalrestsdk.configure(
     }
 )
 
-from flask import Flask, request
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
-
-from datetime import datetime
-import json
-import pika
-
-app=Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://clinic_db_user:rootroot@localhost:3306/payment'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
-CORS(app)
-
-class Payment(db.Model):
-    __tablename__ = 'payment'
-    payment_id = db.Column(db.Integer, primary_key=True)
-    treatment_id = db.Column(db.Integer, db.ForeignKey('treatment_id'),nullable=False)
-    payment_date = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    payment_status=db.Column(db.String(10),nullable=False,default="incompleted")
-    price=db.Column(db.Float,nullable=False)
-
-    
-    def json(self):
-        dto={
-            'payment_id':self.payment_id,
-            'treatment_id':self.treatment_id,
-            'price':self.price,
-            'payment_date':self.payment_date,
-            'payment_status':self.payment_status,
-
-        }
-        return dto
-#get data posted by treatment
-
-@app.route("/payment_id")
+@app.route("/payment/all", methods=['GET'])
 def get_all():
     return {'payments:':[payment.json() for payment in Payment.query.all() ]}
 
 
 @app.route("/payment/paymemt_id")
 def find_payment_by_id(payment_id):
-    payment=payment.query.filter_by(payment_id=payment_id).first()
+    payment = payment.query.filter_by(payment_id = payment_id).first()
     if payment:
         return payment.json()
     return jsonify({"message": "Payment not found."}), 404
@@ -68,13 +46,13 @@ def create_payment(payment_id):
     step_count = 0
     try:
         print("step {step}: processing new payment".format(step = step_count))
-        #retrieve information  about payment and payment items from the request
+        # 1 retrieve information  about payment and payment items from the request
+        step_count += 1
         try: 
             treatment_id = request.json['treatment_id']
             price = request.json['price']
             status = 201
             result = {}
-            step_count += 1
             print("step {step}: get payment data: treatment_id => {t_id}, price => {price}".format(step = step_count, t_id = treatment_id, price = price))
         except Exception as e:
             result = {
@@ -85,7 +63,8 @@ def create_payment(payment_id):
             print("An error occured in step {step}".format(step = step_count))
             return (result)
         
-        # Creating PayPal Payment Obj    
+        # 2 Creating PayPal Payment Obj    
+        step_count += 1
         try:
             print("step {step}: processing new payment".format(step = step_count))
             payment = paypalrestsdk.Payment({
@@ -123,62 +102,86 @@ def create_payment(payment_id):
                 "message":"Can not create PayPal payment Obj, please see error for detail", 
                 "error":str(e)
             }
+            print("An error occured in step {step}".format(step = step_count))
             return (result)
-        print("4")
+
+        # 3 Update new payment to database 
+        step_count += 1
         if payment.create():
-            print("5")
             try:
+                print("step {step}: processing new payment".format(step = step_count))
                 #authorize the payment
                 for link in payment.links:
-                    print("6")
                     if link.rel=='approval_url':
                     # Convert to str to avoid google appengine unicode issue
                     # https://github.com/paypal/rest-api-sdk-python/pull/58
-                        print("7")
                         approval_url = str(link.href)
-                        print("Redirect for approval: %s" % (approval_url))
+                        print("Treatment: {1} linked to redirect url for approval: {0}".format(approval_url, treatment_id))
                         # Creating Payment for DB insertion 
-                        curr_payment = Payment(treatment_id = treatment_id, price = price)
+                        curr_payment = Payment(treatment_id = treatment_id, price = price, pay_url = approval_url)
                         db.session.add(curr_payment)
+                        # Insert payment record into DB
                         db.session.commit()
-                        print("8")
 
                 status=200
-                message="The payment has been created"
+                message="Payment:(linked with treatment:{0}) has been created".format(treatment_id)
                 result={'status':status,"message":message}
             except Exception as e:
                 status=500
         else:
-            print("6")
+            print("An error occured in step {step}:".format(step = step_count))
             print(payment.error)
-            result = {'status':500, "message":"An error occurred when creating the order in DB", "error":str(payment.error)}
+            result = {
+                'status':500, 
+                "message":"An error occurred when creating PayPal Payment Obj", 
+                "error":str(payment.error)
+            }
         return result
-
-        
-
-        payment = paypalrestsdk.Payment.find(payment_id)
-        result={}
-        #match payer id with per parent?
-        if payment.execute({"payer_id":payer_id}):
-            result={'status':200,"message":"Payment execute successfully"}
-        else:
-            print(payment.error) # Error Hash
-            result={'status':500,"message":payment.error}
     except Exception as e: 
         status = 500
         result={'status':500,"message":payment.error}
+        return result
+
+
+@app.route('/paymentupdate/<int:payment_id>', methods = ['POST'])
+def payment_execute(payment_id):
+    print("Executing payment_execute with payment_id: {0};".format(payment_id))
+    #find a payment
+    try:    
+        payment = paypalrestsdk.Payment.find(payment_id)
+        #match payer id with per parent?
+        payer_id = request.json['payer_id']
+        if payment.execute({"payer_id":payer_id}):
+            # received money 
+            result={'status':200,"message":"Payment execute successfully"}
+        else:
+            # got some error
+            print(payment.error) # Error Hash
+            result={'status':500,"message":payment.error}
+        return result
+    except Exception as e: 
+        status = 500
+        result={'status':500,"message":str(e)}
+        return result
+
 
 @app.route('/payment/<int:payment_id>',methods=['PUT'])
 def update_payment_status(payment_id):
-    payment=Payment.query.filter_by(payment_id=payment_id)
+    payment = Payment.query.filter_by(payment_id=payment_id)
+
     paymentpaypal = paypalrestsdk.Payment.find(payment_id)
+
     if "state" in paymentpaypal == 'Completed':
-       payment.payment_status='Completed'
-       date=paymentpaypal["update_time"]
-       payment_date=date
+       payment.payment_status = 'Completed'
+       date = paymentpaypal["update_time"]
+       payment_date = date
        db.session.commit()
     return jsonify(payment.serialize())
 
+def update_payment_status(payment_id, payment_status, ):
+    self.treatment_id = treatment_id 
+    self.price = price 
+    self.pay_url = pay_url
 # def generate_invoice(payment_id):
 #     payment=Payment.query.filter_by(payment_id=payment_id)
 #     paymentpaypal = paypalrestsdk.Payment.find(payment_id)
@@ -205,4 +208,4 @@ def update_payment_status(payment_id):
 #     print(Invoice.error)
  
 if __name__ == '__main__': 
-    app.run(port=5000,debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
