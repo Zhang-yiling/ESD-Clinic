@@ -6,4 +6,9 @@ We run this microservice inside a container, the container will require a list o
 Therefore, we recommend to use the following code to run: 
 
 - pip install -r requirements.txt
-- 
+- python manage.py db init
+- python manage.py db migrate
+- python manage.py db upgrade
+- python manage.py runserver
+
+after these command, the payment microservice should be running on 0.0.0.0:3000 and ready for use.
