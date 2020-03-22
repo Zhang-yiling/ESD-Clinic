@@ -232,27 +232,32 @@ def payment_execute(treatment_id):
 
 def update_payment_db(treatment_id, payment_id, payment_status, payer_id, token):
     """ update a payment """
-    print("update payment info into db")
-    print("------------------------------------------------------------------")
-    paymentpaypal = paypalrestsdk.Payment.find(payment_id)
-    print(paymentpaypal)
-    print("------------------------------------------------------------------")
+    try:
+        print("update payment info into db")
+        print("------------------------------------------------------------------")
+        paymentpaypal = paypalrestsdk.Payment.find(payment_id)
+        print(paymentpaypal)
+        print("------------------------------------------------------------------")
 
-    date = paymentpaypal["update_time"]
-    payment_date = paymentpaypal.transactions[0].related_resources[0].sale.update_time
+        date = paymentpaypal["update_time"]
+        payment_date = paymentpaypal.transactions[0].related_resources[0].sale.update_time
 
-    # get target payment from local DB
-    curr_payment = Payment.query.filter_by(treatment_id=treatment_id).first() 
-    print("get payment record: {0}".format(curr_payment.json()))
-    print("------------------------------------------------------------------")
-    
-    curr_payment.paypal_payment_id = payment_id
-    curr_payment.payment_status = payment_status
-    curr_payment.payment_date = payment_date
-    # commit change
-    db.session.commit()
-    print("record updated")
-    print("------------------------------------------------------------------")
+        # get target payment from local DB
+        curr_payment = Payment.query.filter_by(treatment_id=treatment_id).first() 
+        print("get payment record: {0}".format(curr_payment.json()))
+        print("------------------------------------------------------------------")
+        
+        curr_payment.paypal_payment_id = payment_id
+        curr_payment.payment_status = payment_status
+        curr_payment.payment_date = payment_date
+        # commit change
+        db.session.commit()
+        print("record updated")
+        print("------------------------------------------------------------------")
+    except Exception as e: 
+        print("error happened during update_payment_db()")
+        print(str(e))
+        print("------------------------------------------------------------------")
     return curr_payment.json()
 
 @app.route('/api/payment/<int:payment_id>',methods=['PUT'])
