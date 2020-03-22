@@ -10,6 +10,7 @@ COPY models.py models.py
 ENV dbURL=mysql+mysqlconnector://clinic_db_user:rootroot@3.94.5.154:3306/payment
 
 EXPOSE 3000
+
 CMD [ "python", "manage.py", "db", "migrate" ]
 CMD [ "python", "manage.py", "db", "upgrade"]
 CMD [ "python", "-u", "manage.py", "runserver" ]
