@@ -249,7 +249,7 @@ def update_payment_db(treatment_id, payment_id, payment_status, payer_id, token)
         
         curr_payment.paypal_payment_id = payment_id
         curr_payment.payment_status = payment_status
-        curr_payment.payment_date = payment_date
+        # curr_payment.payment_date = datetime.datetime.utcnow
         # commit change
         db.session.commit()
         print("record updated")
