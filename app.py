@@ -2,6 +2,7 @@ from flask import Flask, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
+from os import environ
 import json
 
 import pika
@@ -10,7 +11,8 @@ import paypalrestsdk
 import logging
 
 app=Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://clinic_db_user:rootroot@localhost:3308/payment'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://clinic_db_user:rootroot@localhost:3308/payment'
+app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('dbURL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
