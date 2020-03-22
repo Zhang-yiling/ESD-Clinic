@@ -21,7 +21,7 @@ class Payment(db.Model):
     def json(self):
         dto={
             "description": self.description,
-            'payment_id':self.paypal_payment_id,
+            'paypal_payment_id':self.paypal_payment_id,
             'treatment_id':self.treatment_id,
             'payment_status':self.payment_status,
             'price':self.price,
