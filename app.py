@@ -100,8 +100,8 @@ def create_payment():
                 "payer": {
                     "payment_method": "paypal"},
                 "redirect_urls": {
-                    "return_url": "http://localhost:3000/api/payment/execute/{}".format(treatment_id),
-                    "cancel_url": "http://localhost:3000/"},
+                    "return_url": "http://ec2-3-94-5-154.compute-1.amazonaws.com:80/api/payment/execute/{}".format(treatment_id),
+                    "cancel_url": "http://ec2-3-94-5-154.compute-1.amazonaws.com:80/"},
                 "transactions": [{
                     "item_list": {
                         "items": [{
