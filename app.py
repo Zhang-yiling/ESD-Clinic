@@ -102,8 +102,8 @@ def create_payment():
                 "payer": {
                     "payment_method": "paypal"},
                 "redirect_urls": {
-                    "return_url": "http://ec2-3-94-5-154.compute-1.amazonaws.com:80/api/payment/execute/{}".format(treatment_id),
-                    "cancel_url": "http://ec2-3-94-5-154.compute-1.amazonaws.com:80/"},
+                    "return_url": "http://ec2-3-94-5-154.compute-1.amazonaws.com:8000/api/payment/execute/{}".format(treatment_id),
+                    "cancel_url": "http://ec2-3-94-5-154.compute-1.amazonaws.com:8000/"},
                 "transactions": [{
                     "item_list": {
                         "items": [{
@@ -276,32 +276,6 @@ def update_payment_status(payment_id):
 
         db.session.commit()
     return jsonify(payment.serialize())
-
-
-# def generate_invoice(payment_id):
-#     payment=Payment.query.filter_by(payment_id=payment_id)
-#     paymentpaypal = paypalrestsdk.Payment.find(payment_id)
-#     invoice = Invoice({
-#     'merchant_info': {
-#         "email": "default@merchant.com",
-#     },
-#     "billing_info": [{
-#         "email": "example@example.com"
-#     }],
-#     "items": [{
-#         "name": "Widgets",
-#         "quantity": 20,
-#         "unit_price": {
-#             "currency": "USD",
-#             "value": 2
-#         }
-#         }],
-#     })
-
-# if Invoice.create():
-#     print(json.dumps(Invoice.to_dict(), sort_keys=False, indent=4))
-# else:
-#     print(Invoice.error)
  
 if __name__ == '__main__': 
     app.run(host='0.0.0.0', port=3000, debug=True)
